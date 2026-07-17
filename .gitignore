@@ -1,0 +1,16 @@
+# Build artefacts
+schemas/gschemas.compiled
+*.pyc
+__pycache__/
+
+# Editor / IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test output
+/test-results
+*.tmp

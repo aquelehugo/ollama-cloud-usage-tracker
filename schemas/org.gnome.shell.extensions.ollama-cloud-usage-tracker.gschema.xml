@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist gettext-domain="gnome-shell-extensions">
+  <schema id="org.gnome.shell.extensions.ollama-cloud-usage-tracker" path="/org/gnome/shell/extensions/ollama-cloud-usage-tracker/">
+    <key name="refresh-interval-minutes" type="i">
+      <default>5</default>
+      <summary>Refresh interval</summary>
+      <description>How often (in minutes) to refetch Ollama Cloud usage. Minimum 1.</description>
+    </key>
+    <key name="preferred-browser" type="s">
+      <default>"auto"</default>
+      <choices>
+        <choice value="auto"/>
+        <choice value="chrome"/>
+        <choice value="firefox"/>
+        <choice value="zen"/>
+      </choices>
+      <summary>Preferred browser for cookies</summary>
+      <description>Which browser profile to read ollama.com session cookies from. Auto tries Chrome, Zen, then Firefox.</description>
+    </key>
+    <key name="show-weekly-bar" type="b">
+      <default>true</default>
+      <summary>Show weekly bar in panel</summary>
+      <description>When off, only the session (5h) bar is shown in the top panel label.</description>
+    </key>
+  </schema>
+</schemalist>
