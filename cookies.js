@@ -30,7 +30,10 @@ import {decryptChromeCookie} from './crypto.js';
 
 const BROWSER_PATHS = {
     chrome: ['google-chrome', 'chromium', 'BraveSoftware/Brave-Browser', 'microsoft-edge'],
-    zen: ['zen'],
+    // Zen is a Firefox-based browser that lives in `~/.zen/` on Linux
+    // (not `~/.config/zen/` like the upstream Firefox profile layout).
+    // It stores its cookies in `cookies.sqlite` inside each profile.
+    zen: ['zen', 'zen/Profiles'],
     firefox: ['firefox'],
 };
 
@@ -117,32 +120,61 @@ function listProfileDirs(root) {
 }
 
 function findFirefoxCookieDb(name) {
-    const base = configHome();
-    for (const p of BROWSER_PATHS[name === 'firefox' ? 'firefox' : 'zen']) {
-        const root = `${base}/${p}`;
-        const dir = Gio.File.new_for_path(root);
-        if (!dir.query_exists(null))
-            continue;
+    // Zen (a Firefox-based browser) keeps its profile at `~/.zen/` on
+    // Linux rather than under `~/.config/`. Firefox itself is at
+    // `~/.config/firefox/`. For Zen we look at the application root
+    // first, then the `<root>/Profiles/<name>` subdir; the latter is
+    // what the Flatpak layout uses.
+    const isZen = name === 'zen';
+    const home = GLib.get_home_dir();
+    const candidateRoots = isZen
+        ? [`${home}/.zen`, ...BROWSER_PATHS.zen.map(p => `${configHome()}/${p}`)]
+        : BROWSER_PATHS.firefox.map(p => `${configHome()}/${p}`);
 
-        const candidates = [root];
-        try {
-            const profiles = Gio.File.new_for_path(`${root}/Profiles`);
-            if (profiles.query_exists(null)) {
+    const collect = (root) => {
+        if (!GLib.file_test(root, GLib.FileTest.EXISTS))
+            return [];
+        const candidates = [];
+        const profilesDir = `${root}/Profiles`;
+        if (GLib.file_test(profilesDir, GLib.FileTest.EXISTS)) {
+            try {
+                const profiles = Gio.File.new_for_path(profilesDir);
                 const en = profiles.enumerate_children('standard::name',
                     Gio.FileQueryInfoFlags.NOFOLLOW_SYMLINKS, null);
                 let info;
+                while ((info = en.next_file(null)) != null)
+                    candidates.push(`${profilesDir}/${info.get_name()}`);
+                en.close(null);
+            } catch (e) { /* ignore */ }
+        } else {
+            // Zen-native: walk the root for profile-like subdirs
+            // (anything whose name doesn't match a known config file).
+            try {
+                const dir = Gio.File.new_for_path(root);
+                const en = dir.enumerate_children('standard::name',
+                    Gio.FileQueryInfoFlags.NOFOLLOW_SYMLINKS, null);
+                const skip = new Set(['Profiles', 'Profile Groups',
+                    'Crash Reports', 'Pending Pings',
+                    'installs.ini', 'profiles.ini']);
+                let info;
                 while ((info = en.next_file(null)) != null) {
-                    candidates.push(`${root}/Profiles/${info.get_name()}`);
+                    const n = info.get_name();
+                    if (skip.has(n))
+                        continue;
+                    candidates.push(`${root}/${n}`);
                 }
                 en.close(null);
-            }
-        } catch (e) { /* ignore */ }
-
-        for (const c of candidates) {
-            const cookies = `${c}/cookies.sqlite`;
-            if (GLib.file_test(cookies, GLib.FileTest.EXISTS))
-                return cookies;
+            } catch (e) { /* ignore */ }
         }
+        return candidates
+            .map(c => `${c}/cookies.sqlite`)
+            .filter(p => GLib.file_test(p, GLib.FileTest.EXISTS));
+    };
+
+    for (const root of candidateRoots) {
+        const found = collect(root);
+        if (found.length > 0)
+            return found[0];
     }
     return null;
 }
@@ -211,16 +243,18 @@ function readSqliteQuery(dbPath, sql) {
         '  sys.exit(1)',
     ].join('\n');
 
-    const [, , stdout, stderr, status] = GLib.spawn_sync(
+    const r = GLib.spawn_sync(
         null,
         ['python3', '-c', script],
         null,
         GLib.SpawnFlags.SEARCH_PATH,
         null,
     );
-    if (status !== 0 || !stdout)
+    // GJS bind of GLib.spawn_sync returns [ok, stdout, stderr, status]
+    // (NOT the C 5-tuple). The first element is a boolean.
+    if (!r[0] || r[3] !== 0)
         return null;
-    const out = stdout.toString('utf-8').trim();
+    const out = r[1] ? new TextDecoder('utf-8').decode(r[1]).trim() : '';
     if (!out)
         return [];
     try {
@@ -299,6 +333,13 @@ function toUint8(value) {
     return new Uint8Array(0);
 }
 
+function profileFromPath(cookiePath) {
+    // "/home/user/.zen/abc123.def/cookies.sqlite" → "abc123.def"
+    // "/home/user/.zen/Profiles/default-release/cookies.sqlite" → "default-release"
+    const m = cookiePath.match(/\/([^/]+)\/cookies\.sqlite$/);
+    return m ? m[1] : 'profile';
+}
+
 function friendlyName(name, path) {
     const m = path.match(/\/([\w-]+)\/(Profile [^/]+|Default|Profile 1)\/Cookies/);
     const profile = m ? m[2] : 'profile';
@@ -325,41 +366,117 @@ function friendlyName(name, path) {
 // we work from a temp copy.
 
 async function loadFromFirefox(name) {
-    const cookiePath = findFirefoxCookieDb(name);
-    if (!cookiePath)
-        return ERROR.noProfile();
+    // Collect cookies from every Firefox/Zen profile.  A user with
+    // Multi-Account Containers (or simply multiple profiles) may have
+    // ollama.com session cookies spread across several profiles /
+    // containers, so we merge them all.
+    const candidates = findAllFirefoxCookieDbs(name);
+    const merged = {};
+    const sources = [];
+    for (const path of candidates) {
+        const dbCookies = await readFirefoxCookieDb(path);
+        if (dbCookies) {
+            Object.assign(merged, dbCookies);
+            sources.push(profileFromPath(path));
+        }
+    }
+    if (Object.keys(merged).length === 0)
+        return ERROR.noLogin();
+    return {
+        header: Object.entries(merged)
+            .map(([k, v]) => `${k}=${v}`).join('; '),
+        source: name === 'zen'
+            ? `Zen/${sources.join(',')}`
+            : `Firefox/${sources.join(',')}`,
+    };
+}
+
+/** Find every cookies.sqlite under all Zen/Firefox roots. */
+function findAllFirefoxCookieDbs(name) {
+    const isZen = name === 'zen';
+    const home = GLib.get_home_dir();
+    const candidateRoots = isZen
+        ? [`${home}/.zen`, ...BROWSER_PATHS.zen.map(p => `${configHome()}/${p}`)]
+        : BROWSER_PATHS.firefox.map(p => `${configHome()}/${p}`);
+    const out = [];
+    const seen = new Set();
+    for (const root of candidateRoots) {
+        if (!GLib.file_test(root, GLib.FileTest.EXISTS))
+            continue;
+        const profilesDir = `${root}/Profiles`;
+        if (GLib.file_test(profilesDir, GLib.FileTest.EXISTS)) {
+            try {
+                const profiles = Gio.File.new_for_path(profilesDir);
+                const en = profiles.enumerate_children('standard::name',
+                    Gio.FileQueryInfoFlags.NOFOLLOW_SYMLINKS, null);
+                let info;
+                while ((info = en.next_file(null)) != null) {
+                    const p = `${profilesDir}/${info.get_name()}/cookies.sqlite`;
+                    if (GLib.file_test(p, GLib.FileTest.EXISTS) && !seen.has(p)) {
+                        out.push(p);
+                        seen.add(p);
+                    }
+                }
+                en.close(null);
+            } catch (e) { /* ignore */ }
+        } else {
+            try {
+                const dir = Gio.File.new_for_path(root);
+                const en = dir.enumerate_children('standard::name',
+                    Gio.FileQueryInfoFlags.NOFOLLOW_SYMLINKS, null);
+                const skip = new Set(['Profiles', 'Profile Groups',
+                    'Crash Reports', 'Pending Pings',
+                    'installs.ini', 'profiles.ini']);
+                let info;
+                while ((info = en.next_file(null)) != null) {
+                    const n = info.get_name();
+                    if (skip.has(n))
+                        continue;
+                    const p = `${root}/${n}/cookies.sqlite`;
+                    if (GLib.file_test(p, GLib.FileTest.EXISTS) && !seen.has(p)) {
+                        out.push(p);
+                        seen.add(p);
+                    }
+                }
+                en.close(null);
+            } catch (e) { /* ignore */ }
+        }
+    }
+    return out;
+}
+
+/** Read ollama.com cookies from one cookies.sqlite; returns a dict or null. */
+async function readFirefoxCookieDb(cookiePath) {
     const tmpPath = copyToTemp(cookiePath);
     if (!tmpPath)
-        return ERROR.failed('Could not read cookies.sqlite');
-
+        return null;
     try {
         const rows = readSqliteQuery(tmpPath,
             "SELECT name, value FROM moz_cookies " +
             "WHERE host IN ('ollama.com', '.ollama.com')");
         if (!rows || rows.length === 0)
-            return ERROR.noLogin();
-
+            return null;
         const cookies = {};
         for (const row of rows) {
             if (row.name && row.value != null)
                 cookies[row.name] = String(row.value);
         }
-        if (Object.keys(cookies).length === 0)
-            return ERROR.noLogin();
-
-        return {
-            header: Object.entries(cookies)
-                .map(([k, v]) => `${k}=${v}`).join('; '),
-            source: name === 'zen'
-                ? `Zen/${profileFromPath(cookiePath)}`
-                : `Firefox/${profileFromPath(cookiePath)}`,
-        };
+        return Object.keys(cookies).length > 0 ? cookies : null;
     } finally {
         try { GLib.unlink(tmpPath); } catch (e) { /* ignore */ }
     }
 }
 
-function profileFromPath(path) {
-    const m = path.match(/\/([\w.-]+)\/cookies\.sqlite$/);
-    return m ? m[1] : 'default';
+/** Try one profile; return the {header, source} on success, null on no cookies. */
+async function tryFirefoxCookieDb(cookiePath, name) {
+    const cookies = await readFirefoxCookieDb(cookiePath);
+    if (!cookies)
+        return null;
+    return {
+        header: Object.entries(cookies)
+            .map(([k, v]) => `${k}=${v}`).join('; '),
+        source: name === 'zen'
+            ? `Zen/${profileFromPath(cookiePath)}`
+            : `Firefox/${profileFromPath(cookiePath)}`,
+    };
 }
