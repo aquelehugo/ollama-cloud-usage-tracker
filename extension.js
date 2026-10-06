@@ -63,7 +63,10 @@ class Indicator extends PanelMenu.Button {
         this._buildMenu();
 
         this._scraper.connect('updated', () => this._refresh());
-        this._scraper.connect('error', (_s, err) => this._showError(err));
+        this._scraper.connect('error', (_s, message, hint) => {
+            log(`[ollama-tracker] error signal: message=${JSON.stringify(message)} hint=${JSON.stringify(hint)}`);
+            this._showError({error: message, hint});
+        });
 
         this._settingsChangedId = this._settings.connect('changed', (_s, key) => {
             if (key === 'refresh-interval-minutes')

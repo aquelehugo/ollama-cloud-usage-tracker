@@ -52,6 +52,7 @@ export const Scraper = GObject.registerClass({
                 this.emit('updated');
             })
             .catch(err => {
+                log(`[ollama-tracker] fetch error: ${JSON.stringify(err)}`);
                 const message = err?.error ?? 'Network error';
                 const hint = err?.hint ?? 'Check your network connection';
                 this._data = null;
@@ -91,7 +92,9 @@ export const Scraper = GObject.registerClass({
 
     async _fetch() {
         const preferred = this._settings.get_string('preferred-browser');
+        log(`[ollama-tracker] fetch start, preferred=${preferred}`);
         const cookies = await getCookiesForOllama(preferred);
+        log(`[ollama-tracker] cookies result: ${JSON.stringify(cookies).substring(0, 200)}`);
         if (!cookies || cookies.error)
             return Promise.reject(cookies);
         if (!cookies.header)
