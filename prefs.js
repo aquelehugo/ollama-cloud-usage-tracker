@@ -16,7 +16,7 @@ import Gio from 'gi://Gio';
 import GObject from 'gi://GObject';
 import Gtk from 'gi://Gtk';
 
-import {ExtensionPreferences} from 'resource:///org/gnome/Shell/Extensions/js/extensionsPrefs.js';
+import {ExtensionPreferences} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
 const BROWSER_LABELS = {
     auto: 'Auto-detect (Chrome → Zen → Firefox)',
@@ -111,4 +111,4 @@ export default class OllamaCloudUsagePrefs extends ExtensionPreferences {
             subtitle: 'The extension reads session cookies from a local browser to fetch your usage.',
         }));
     }
-});
+}
