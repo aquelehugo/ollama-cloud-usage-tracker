@@ -17,6 +17,18 @@ const PALETTE = {
     error: '#e01b24',
 };
 
+// GNOME 45 kept the static St.ThemeContext.get_default(); 46+ dropped it
+// in favour of get_for_stage(). Resolve whichever the running shell has
+// (null ⇒ the preferred-height/width vfuncs fall back to static metric
+// estimates instead of crashing the allocation).
+function themeContext() {
+    if (typeof St.ThemeContext.get_for_stage === 'function')
+        return St.ThemeContext.get_for_stage(global.stage);
+    if (typeof St.ThemeContext.get_default === 'function')
+        return St.ThemeContext.get_default();
+    return null;
+}
+
 export const Bar = GObject.registerClass({
     Properties: {
         pct: GObject.ParamSpec.double('pct', null, null,
@@ -71,8 +83,9 @@ export const Bar = GObject.registerClass({
 
     vfunc_get_preferred_height(_forWidth) {
         // 1 em tall — keep aligned with the rest of the panel
-        const theme = St.ThemeContext.get_default().get_theme();
-        const fd = theme.get_font('panel-status-indicators-keyboard');
+        const ctx = themeContext();
+        const theme = ctx ? ctx.get_theme() : null;
+        const fd = theme ? theme.get_font('panel-status-indicators-keyboard') : null;
         const metrics = fd ? fd.get_metrics() : null;
         const ascent = metrics ? metrics.get_ascent() : 11;
         const descent = metrics ? metrics.get_descent() : 3;
@@ -81,8 +94,9 @@ export const Bar = GObject.registerClass({
     }
 
     vfunc_get_preferred_width(_forHeight) {
-        const theme = St.ThemeContext.get_default().get_theme();
-        const fd = theme.get_font('panel-status-indicators-keyboard');
+        const ctx = themeContext();
+        const theme = ctx ? ctx.get_theme() : null;
+        const fd = theme ? theme.get_font('panel-status-indicators-keyboard') : null;
         const extents = fd ? fd.get_extents('█'.repeat(this._cells), null) : null;
         const width = extents ? Math.ceil(extents[1].width / 1024) + 2 : this._cells * 12;
         return [width, width];
