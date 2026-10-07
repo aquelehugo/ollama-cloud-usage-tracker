@@ -20,11 +20,19 @@ Inspired by the GNOME extension in `../gnome/`.
 
 ## How to use
 
-After installing (below), the widget appears in the system tray:
+After installing (below), the widget appears in the system tray. The
+compact item adapts to the space it actually gets — measured at
+runtime, so high-DPI/panel changes need no extra config:
 
-```
-  ♥ 34% / 45%
-```
+- **Panel placement / roomy tray** (e.g. the tray's "Scale icons to
+  fit" mode): full GNOME-format label — icon + `34% / 45%`.
+- **Standard tray cell** (Plasma 5.27 force-fills every applet into an
+  icon-sized box and ignores width requests): battery-parity badge —
+  ollama icon with the rounded session percentage in the corner (or a
+  small centred `%` figure when the icon is hidden). Full numbers stay
+  one click away in the popup.
+- `—` = no data yet, `!` = error (details in the popup, warning icon
+  instead of the ollama logo).
 
 - Left-click: opens the popup — header ("Last updated … via
   `Zen/…`"), **Session (5h)** and **Weekly (7d)** quota bars
