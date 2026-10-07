@@ -147,6 +147,10 @@ metadata.json             Extension metadata (UUID, shell versions)
 schemas/                  GSettings schema (compiled)
 bar.js                    Painted quota bar widget
 scraper.js                Thin lifecycle wrapper around cli/usage.js
+ollama-icon.png           Panel icon — vendored ollama.com artwork,
+                          same file as the Plasma widget's
+                          (android-chrome-icon-192x192.png 404s; the
+                          artwork is ollama.com's apple-touch-icon)
 cli -> ../cli             Symlink to the shared usage core (source of truth)
 tests/                    gjs test suite (imports shared modules via cli/)
 ```

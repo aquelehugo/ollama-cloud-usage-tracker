@@ -100,7 +100,7 @@ zip: schemas
 	mkdir -p $$ext/cli; \
 	cp $(GNOME)/bar.js $(GNOME)/extension.js $(GNOME)/metadata.json \
 		$(GNOME)/prefs.js $(GNOME)/scraper.js $(GNOME)/README.md \
-		$(ROOT)/LICENSE $$ext/; \
+		$(GNOME)/ollama-icon.png $(ROOT)/LICENSE $$ext/; \
 	cp -r $(GNOME)/schemas $$ext/schemas; \
 	cp -L $(CLI)/usage.js $(CLI)/cookies.js $(CLI)/crypto.js $(CLI)/pbkdf2.js $$ext/cli/; \
 	( cd $$ext && zip -q -r $(DIST)/$(UUID).zip . ); \

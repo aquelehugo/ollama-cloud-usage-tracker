@@ -38,6 +38,7 @@ class Indicator extends PanelMenu.Button {
         this._extension = extension;
         this._settings = extension.getSettings();
         this._scraper = new Scraper(extension);
+        this._ollamaIcon = this._loadOllamaIcon();
 
         // Top bar: icon + compact label
         const box = new St.BoxLayout({
@@ -47,7 +48,7 @@ class Indicator extends PanelMenu.Button {
         this.add_child(box);
 
         this._icon = new St.Icon({
-            icon_name: 'dialog-face-smile-symbolic',
+            gicon: this._ollamaIcon,
             style_class: 'system-status-icon',
         });
         box.add_child(this._icon);
@@ -144,6 +145,18 @@ class Indicator extends PanelMenu.Button {
         bin.get_children().forEach(c => c.destroy());
     }
 
+    // Ollama artwork vendored into the extension (same file as the Plasma
+    // widget's icon — ollama.com's touch icon; the android-chrome URL in
+    // the spec 404s). Falls back to a themed icon if the png is missing.
+    _loadOllamaIcon() {
+        const dir = this._extension.dir ? this._extension.dir.get_path() : null;
+        const path = dir ? `${dir}/ollama-icon.png` : null;
+        if (path && GLib.file_test(path, GLib.FileTest.EXISTS))
+            return Gio.icon_new_for_string(path);
+        log(`[ollama-tracker] ${path ?? 'extension dir'}: ollama-icon.png missing, using themed fallback`);
+        return Gio.ThemedIcon.new('face-smile-symbolic');
+    }
+
     _populateQuota(bin, title, bar, detailText) {
         this._clearBin(bin);
         const row = new St.BoxLayout({x_expand: true});
@@ -157,7 +170,7 @@ class Indicator extends PanelMenu.Button {
 
     _refresh() {
         const data = this._scraper.data;
-        this._icon.icon_name = 'dialog-face-smile-symbolic';
+        this._icon.gicon = this._ollamaIcon;
 
         if (!data) {
             this._label.set_text('—');
@@ -221,7 +234,7 @@ class Indicator extends PanelMenu.Button {
             x_expand: true,
         }));
         this._label.set_text('!');
-        this._icon.icon_name = 'dialog-warning-symbolic';
+        this._icon.gicon = Gio.ThemedIcon.new('dialog-warning-symbolic');
         this._statusLabel.set_text(_('Open the menu for details'));
     }
 
