@@ -15,7 +15,7 @@
         "License": "MIT",
         "Name": "Ollama Cloud Usage Tracker",
         "ServiceTypes": ["Plasma/Applet"],
-        "Version": "0.1.1",
+        "Version": "0.1.2",
         "Website": "https://github.com/aquelehugo/ollama-cloud-usage-tracker"
     },
     "X-Plasma-API": "declarativeappletscript",

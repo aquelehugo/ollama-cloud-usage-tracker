@@ -39,6 +39,7 @@ class Indicator extends PanelMenu.Button {
         this._settings = extension.getSettings();
         this._scraper = new Scraper(extension);
         this._ollamaIcon = this._loadOllamaIcon();
+        log(`[ollama-tracker] indicator up (v${extension.metadata.version})`);
 
         // Top bar: icon + compact label
         const box = new St.BoxLayout({
