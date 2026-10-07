@@ -71,6 +71,18 @@ judge.
   `{error, hint}`. Changing it is a breaking change for both surfaces
   and for any script piping `--json`.
 
+### How the Plasma widget depends on this folder
+
+Plasma applets can't import sibling gjs modules at runtime, so
+`plasma/` runs this CLI directly: the widget invokes
+`ollama-usage.js --json` (the executable dataengine) and renders the
+JSON contract above. Auto-detection order: widget's CLI-path setting,
+then the repo checkout (`<repo>/plasma/../cli/`, via `make
+install-plasma`), then `$PATH`, then `~/.local/bin/ollama-usage`
+(`make bin`). The JSON contract is therefore load-bearing here: keep
+error output in the `{error, hint}` shape and valid single-line JSON
+on stdout.
+
 ## Dependencies
 
 - `gjs` (GLib/Soup bindings)

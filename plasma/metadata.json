@@ -1,0 +1,25 @@
+{
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "aquelehugo"
+            }
+        ],
+        "BugReportUrl": "https://github.com/aquelehugo/ollama-cloud-tracker-gnome/issues",
+        "Category": "System Information",
+        "Description": "Ollama Cloud session (5h) and weekly (7d) quota bars in the system tray. Powered by the ollama-usage CLI (source of truth).",
+        "EnabledByDefault": true,
+        "FormFactors": ["desktop"],
+        "Icon": "ollama-cloud-usage",
+        "Id": "ollama.cloud.usage.tracker",
+        "License": "MIT",
+        "Name": "Ollama Cloud Usage Tracker",
+        "ServiceTypes": ["Plasma/Applet"],
+        "Version": "0.1.0",
+        "Website": "https://github.com/aquelehugo/ollama-cloud-tracker-gnome"
+    },
+    "X-Plasma-API": "declarativeappletscript",
+    "X-Plasma-MainScript": "ui/main.qml",
+    "X-Plasma-NotificationArea": "true",
+    "X-Plasma-NotificationAreaCategory": "ApplicationStatus"
+}
