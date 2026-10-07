@@ -1,5 +1,5 @@
 # Build artefacts
-schemas/gschemas.compiled
+gnome/schemas/gschemas.compiled
 *.pyc
 __pycache__/
 
