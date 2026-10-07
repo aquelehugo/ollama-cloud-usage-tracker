@@ -117,10 +117,14 @@ Item {
         return "'" + s.replace(/'/g, "'\\''") + "'";
     }
 
-    // Ordered auto-detection for the CLI. Config wins. In the dev
-    // checkout the package root is <repo>/plasma, so the shared core is
-    // one level up: <repo>/cli/ollama-usage.js (exactly the same code the
-    // GNOME extension imports through its gnome/cli symlink).
+    // Ordered auto-detection for the shared CLI core. The CLI-path
+    // setting wins. Then: the repo checkout's cli/ one level above the
+    // package (the old symlink-dev layout), the cli/ copy baked INSIDE
+    // the installed package by `make install-plasma` (works on a clean
+    // $PATH — this is what makes installs foolproof), and finally the
+    // PATH wrapper installed by `make bin`. A literal~ candidate would
+    // never resolve (the dataengine splits the command without a shell),
+    // so it is intentionally absent.
     function candidates() {
         var list = [];
         if (root.cfgCliPath !== "")
@@ -128,11 +132,12 @@ Item {
         var ru = root.packageRoot.toString();
         if (ru.indexOf("file://") === 0) {
             var pkgPath = decodeURIComponent(ru.slice("file://".length));
-            var cliPath = pkgPath.replace(/\/+$/, "") + "/../cli/ollama-usage.js";
-            list.push(root.shellQuote(cliPath) + " --json");
+            list.push(root.shellQuote(pkgPath.replace(/\/+$/, "")
+                + "/../cli/ollama-usage.js") + " --json");
+            list.push(root.shellQuote(pkgPath.replace(/\/+$/, "")
+                + "/cli/ollama-usage.js") + " --json");
         }
         list.push("ollama-usage --json");
-        list.push("~/.local/bin/ollama-usage --json");
         return list;
     }
 
@@ -158,7 +163,11 @@ Item {
         function tryNext(lastStderr) {
             if (idx >= cands.length) {
                 fail("Ollama usage CLI not found",
-                     "Set the CLI path in the widget settings or install the CLI on your PATH (see plasma/README.md)"
+                     "Fix it by either:\n"
+                     + "  • re-installing this widget from its repo: make install-plasma"
+                       + " (installs the CLI wrapper + an in-package copy of the core), or\n"
+                     + "  • setting the absolute path to cli/ollama-usage.js in the"
+                       + " widget settings (\"CLI path\")."
                      + (lastStderr !== "" ? "\n\n" + lastStderr : ""));
                 return;
             }

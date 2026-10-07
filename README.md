@@ -78,18 +78,18 @@ make zip          # -> dist/<uuid>.zip
 ### Plasma widget
 
 ```sh
-make bin              # put CLI on ~/.local/bin (widget discovery)
-make install-plasma   # kpackagetool5 copy-install + hicolor icon
-make panel-add        # place on the first panel (or Add Widgets manually)
+make install-plasma   # checks deps, installs CLI wrapper + package + baked cli/ core
+make panel-add        # idempotent, places it on the first panel
 ```
 
 A **standalone panel widget**: ollama icon + `34% / 45%` on the panel,
 click opens the popup (quota bars, countdowns, refresh, settings
 link). It degrades to a compact badge inside the system tray — that
-tray structurally cannot show wide text. The widget runs the CLI with
-`--json`; discovery order is the CLI-path setting → `$PATH`
-(~/.local/bin via `make bin`). Note: re-run `make install-plasma`
-after QML edits. See [plasma/README.md](plasma/README.md) for details.
+tray structurally cannot show wide text. Missing dependencies abort
+the install with per-item hints (gjs, libsecret, python3, openssl),
+and the CLI core is installed alongside the package, so discovery
+works on a clean PATH. Re-run `make install-plasma` after QML edits.
+See [plasma/README.md](plasma/README.md) for details.
 
 ## Usage
 

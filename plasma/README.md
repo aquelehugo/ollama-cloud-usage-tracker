@@ -55,54 +55,56 @@ runtime, so high-DPI/panel changes need no extra config:
 
 ## How to install
 
-Requirements: **Plasma 5.27** (target of this package; Plasma 6 port
-not started), the CLI dependency set: `gjs`, `libsecret`, `python3`,
-`openssl` (the widget shells out to the CLI), and a browser with an
-`ollama.com` session.
+Requirements (auto-checked by the installer): **Plasma 5.27** (target
+of this package; Plasma 6 port not started), `gjs` with the
+GLib/Gio/Soup/Secret typelibs (i.e. the runtime for the shared CLI
+core — on a pure-Plasma system install `gjs libsecret-1-0`), `python3`
+and `openssl`, plus a browser with an `ollama.com` session.
 
-From the repo root:
+One command from the repo root covers everything:
 
 ```bash
-make bin                                            # CLI wrapper at ~/.local/bin/ollama-usage
-make install-plasma                                 # kpackagetool5 -i/-u copy + hicolor icon
-make panel-add                                      # place on the first panel
+make install-plasma
 ```
 
-Or add manually: right-click a panel → *Add Widgets…* → 
-**Ollama Cloud Usage Tracker** (appears in the picker right after
-`install-plasma`; no shell restart needed — plasmashell watches the
-plasmoid dirs).
+It (1) checks the dependencies and fails with per-item install hints,
+(2) puts the CLI wrapper on `~/.local/bin` (`make bin`, done inside),
+(3) installs the widget package via `kpackagetool5` and the hicolor
+icon, and (4) copies `cli/` inside the installed package, so the
+widget's CLI auto-detect works with a completely clean `$PATH`. Then:
 
-`install-plasma` copies the package via `kpackagetool5`
-(**not** a symlink: KPackage discovery does not read symlinked plasmoid
-dirs — unlike GNOME Shell extension folders; verified live) and
-installs the ollama icon into `hicolor`. It is a PANEL widget now:
-tray auto-add metadata (`X-Plasma-NotificationArea`) was removed — if
-the tray still shows a stale badge entry from earlier installs, remove
-it in *Configure System Tray → Items* or with `make panel-remove` / a
-config purge.
+```bash
+make panel-add        # idempotent — places it on the first panel
+```
+
+Or place manually: right-click a panel → *Add Widgets…* →
+**Ollama Cloud Usage Tracker** (no shell restart required).
+
+`install-plasma` copies, never symlinks — KPackage discovery does not
+read symlinked plasmoid dirs (unlike GNOME Shell folders; verified
+live). The in-package `cli/` and `~/.local/bin` entries are build
+artefacts (allowed duplication under the source-of-truth rule — the
+SOURCE stays deduplicated in `../cli/`).
 
 Dev loop: edit → `make install-plasma` → restart plasmashell
 (`systemctl --user restart plasma-plasmashell.service`).
 
-### CLI discovery
+### CLI discovery (how the widget finds the core)
 
-The widget must find `cli/ollama-usage.js` (the source of truth). It
-tries, in order:
+Checked in order, first success wins; on failure the popup shows the
+error plus a hint with these exact remedies:
 
-1. **CLI path** setting (widget settings) — absolute path, e.g.
-   `/home/you/projects/…/cli/ollama-usage.js`
-2. **Repo checkout copy** — only meaningful if the installed package
-   sits next to a `cli/` dir
-3. **`ollama-usage` on `$PATH`** — the normal case after `make bin`,
-   which installs a wrapper script (`exec gjs -m <repo>/cli/ollama-usage.js`)
-   at `~/.local/bin/ollama-usage`. A plain symlink to the script is NOT
-   enough: gjs needs the module's real `.js` path to resolve its
-   relative imports.
-4. (fallback) bare `ollama-usage` lookup — covered by #3 when
-   `~/.local/bin` is on `$PATH` (it is, on stock Ubuntu/Plasma)
+1. **CLI path** setting (widget settings) — absolute path,
+   e.g. `/home/you/projects/…/cli/ollama-usage.js`
+2. **Repo checkout** — `<repo>/plasma/../cli/ollama-usage.js` (old
+   symlink-layout candidate, cheap to probe)
+3. **In-package copy** — `<installed>/<id>/cli/ollama-usage.js`, baked
+   by `make install-plasma` — the normal fully-installed case
+4. **`ollama-usage` on `$PATH`** — the wrapper from `make bin`
 
-If nothing resolves, the widget shows `!` with a hint in the popup.
+Note: a literal `~/.local/bin/…` candidate is deliberately absent —
+the executable dataengine splits the command without a shell, so `~`
+would never expand (candidate 3/4 cover the same ground reliably).
 
 ## Config
 
