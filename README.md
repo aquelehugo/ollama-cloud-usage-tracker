@@ -158,7 +158,7 @@ side by side; older versions (if any) get their own folder.
 
 ## License
 
-MIT — see [gnome/LICENSE](gnome/LICENSE). Parser strategy and
+MIT — see the repository root [LICENSE](LICENSE). Parser strategy and
 pace-colour heuristic derived from
 [pi-ollama-cloud-usage-tracker](https://github.com/Entelligentsia/pi-ollama-cloud-usage-tracker)
 by Entelligentsia (also MIT).

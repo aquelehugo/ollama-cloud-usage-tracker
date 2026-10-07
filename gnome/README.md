@@ -168,7 +168,7 @@ the symlink, so it exercises the same code the runtime loads.
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Parser strategy and pace-colour
+MIT — see the repository root [LICENSE](../LICENSE). Parser strategy and pace-colour
 heuristic derived from
 [pi-ollama-cloud-usage-tracker](https://github.com/Entelligentsia/pi-ollama-cloud-usage-tracker)
 by Entelligentsia (also MIT).

@@ -162,4 +162,4 @@ machine's Plasma 5.27 session.
 
 ## License
 
-MIT — see [../gnome/LICENSE](../gnome/LICENSE).
+MIT — see the repository root [LICENSE](../LICENSE).
