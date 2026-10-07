@@ -3,32 +3,23 @@
 //
 // Ollama Cloud Usage CLI — reports Ollama Cloud quota usage on demand.
 //
-// Extracts the fetching logic from the GNOME Shell extension (gnome/)
-// into a standalone terminal tool. Reads ollama.com session cookies
-// from a local browser (Chrome / Chromium / Brave / Edge / Zen /
-// Firefox) exactly like the extension — see cli/cookies.js — by
-// lifting them via libsecret and the appropriate cookie-store reader
-// (PBKDF2 + AES for Chromium variants, raw SQLite for Firefox/Zen).
+// Thin entry point: argument parsing + terminal rendering. The
+// fetch/parse pipeline lives in ./usage.js — the shared source of
+// truth also consumed by the GNOME Shell extension (gnome/scraper.js).
 //
-// The pipeline mirrors gnome/scraper.js: cookies → Soup GET of
-// ollama.com/settings → HTML usage regexes → {session, weekly}
-// percentages + reset timestamps. Rendering is terminal-side: colored
-// quota bars, percentages and reset countdowns, or plain JSON with
-// --json for scripts / status bars.
+// Reads ollama.com session cookies from a local browser (Chrome /
+// Chromium / Brave / Edge / Zen / Firefox) exactly like the extension —
+// see cli/cookies.js — by lifting them via libsecret and the
+// appropriate cookie-store reader (PBKDF2 + AES for Chromium variants,
+// raw SQLite for Firefox/Zen).
 //
 // Usage: ./ollama-usage.js [--json] [--browser NAME] [--cookies]
 //                          [--color | --no-color] [-h]
 
-import Soup from 'gi://Soup';
 import GLib from 'gi://GLib';
 import System from 'system';
 
-import {getCookiesForOllama} from './cookies.js';
-
-const SETTINGS_URL = 'https://ollama.com/settings';
-const USER_AGENT =
-    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 ' +
-    '(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
+import {fetchUsage} from './usage.js';
 
 const VERSION = '0.1.0';
 const BROWSER_CHOICES = ['auto', 'chrome', 'chromium', 'brave', 'edge', 'zen', 'firefox'];
@@ -60,7 +51,7 @@ Options:
 
 Examples:
   ollama-usage                     # human-readable quota bars
-  ollama-usage --browser firefox   # force reading Firefox cookies
+  ollama-usage --browser firefox   # force Firefox cookies
   ollama-usage --json | jq .       # machine-readable output
 
 Dependencies: gjs, libsecret (keyring), python3 (sqlite), openssl.`;
@@ -95,103 +86,6 @@ function parseArgs(argv) {
     if (!BROWSER_CHOICES.includes(opts.browser))
         die(`Invalid --browser '${opts.browser}'. Choose: ${BROWSER_CHOICES.join(', ')}`);
     return opts;
-}
-
-// ---------------------------------------------------------------------------
-// Fetch pipeline — mirrors gnome/scraper.js without GObject signals
-// ---------------------------------------------------------------------------
-
-/**
- * @param {string} preferred
- * @returns {Promise<{fetched_at, browser, session_pct?, weekly_pct?,
- *   session_resets_at?, weekly_resets_at?} | {error, hint}>}
- */
-async function fetchUsage(preferred) {
-    const cookies = await getCookiesForOllama(preferred);
-    if (cookies.error)
-        return cookies;
-    if (!cookies.header)
-        return {error: 'No cookies', hint: 'Internal error'};
-
-    // Cookie names only — values stay out of logs, terminals and JSON.
-    const cookieNames = cookies.header.split(';')
-        .map(part => part.split('=')[0].trim())
-        .filter(n => n.length > 0);
-
-    const session = new Soup.Session({user_agent: USER_AGENT});
-    const msg = Soup.Message.new('GET', SETTINGS_URL);
-    msg.request_headers.append('Cookie', cookies.header);
-    msg.request_headers.append('User-Agent', USER_AGENT);
-    msg.request_headers.append('Accept', 'text/html,application/xhtml+xml');
-
-    const html = await new Promise((resolve, reject) => {
-        session.send_and_read_async(
-            msg,
-            GLib.PRIORITY_DEFAULT,
-            null,
-            (s, result) => {
-                try {
-                    const input = s.send_and_read_finish(result);
-                    if (msg.status_code >= 300 && msg.status_code < 400)
-                        return reject({error: 'No ollama.com session',
-                            hint: 'Log in to ollama.com in your browser, then retry'});
-                    if (msg.status_code < 200 || msg.status_code >= 300)
-                        return reject({error: `HTTP ${msg.status_code}`,
-                            hint: 'Check your network connection'});
-                    resolve(new TextDecoder('utf-8').decode(input.get_data()));
-                } catch (e) {
-                    reject({error: 'Network error', hint: String(e?.message ?? e)});
-                }
-            },
-        );
-    });
-
-    const parsed = parseUsageHtml(html, cookies.source);
-    if (!parsed)
-        return {error: 'No usage data', hint: 'Check your Ollama Cloud subscription'};
-    parsed.cookie_names = cookieNames;
-    return parsed;
-}
-
-// ---------------------------------------------------------------------------
-// Parser — identical to gnome/scraper.js
-// ---------------------------------------------------------------------------
-
-const USAGE_REGEX = /aria-label="(Session|Weekly) usage (\d+(?:\.\d+)?)%/g;
-const TIME_REGEX = /data-time="([^"]+)"/g;
-const TESTID_REGEX = /data-testid="(session|weekly)-usage"[^>]*>\s*(\d+(?:\.\d+)?)\s*%/g;
-
-function parseUsageHtml(html, source) {
-    const result = {fetched_at: new Date().toISOString(), browser: source ?? null};
-
-    let m;
-    const usages = [];
-    while ((m = USAGE_REGEX.exec(html)) !== null)
-        usages.push({window: m[1].toLowerCase(), pct: parseFloat(m[2])});
-    if (usages.length === 0) {
-        while ((m = TESTID_REGEX.exec(html)) !== null)
-            usages.push({window: m[1].toLowerCase(), pct: parseFloat(m[2])});
-    }
-    for (const u of usages) {
-        if (u.window === 'session')
-            result.session_pct = u.pct;
-        else if (u.window === 'weekly')
-            result.weekly_pct = u.pct;
-    }
-
-    const timestamps = [];
-    while ((m = TIME_REGEX.exec(html)) !== null)
-        timestamps.push(m[1]);
-    if (timestamps[0] && result.session_pct != null)
-        result.session_resets_at = timestamps[0];
-    if (timestamps[1] && result.weekly_pct != null)
-        result.weekly_resets_at = timestamps[1];
-    if (timestamps.length === 1 && result.session_pct == null && result.weekly_pct != null)
-        result.weekly_resets_at = timestamps[0];
-
-    if (result.session_pct == null && result.weekly_pct == null)
-        return null;
-    return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -321,12 +215,8 @@ async function main() {
         return 0;
     }
 
-    if (!opts.json) {
-        // Only print waiting notice for human mode; JSON must stay clean.
-        const c = paint(opts);
-        if (opts.cookieInfo)
-            print(c.dim('Reading browser cookies…'));
-    }
+    if (!opts.json && opts.cookieInfo)
+        print(paint(opts).dim('Reading browser cookies…'));
 
     const data = await fetchUsage(opts.browser);
 

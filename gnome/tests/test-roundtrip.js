@@ -5,7 +5,7 @@
 // prepends the "v10" header, and round-trips through
 // decryptChromeCookie. The plaintext should come back unchanged.
 
-import {deriveChromeV10Key, decryptChromeCookie} from '../crypto.js';
+import {deriveChromeV10Key, decryptChromeCookie} from '../../cli/crypto.js';
 import GLib from 'gi://GLib';
 
 const PASSWORD = 'peanuts';

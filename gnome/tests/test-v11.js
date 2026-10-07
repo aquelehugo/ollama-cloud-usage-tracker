@@ -12,7 +12,7 @@
 //   3. Pad to 16-byte multiple, encrypt with openssl.
 //   4. Prepend "v11" to the ciphertext.
 
-import {deriveChromeV11Key, decryptChromeCookie} from '../crypto.js';
+import {deriveChromeV11Key, decryptChromeCookie} from '../../cli/crypto.js';
 import GLib from 'gi://GLib';
 
 const PASSWORD = 'peanuts';

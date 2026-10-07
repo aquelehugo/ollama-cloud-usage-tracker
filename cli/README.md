@@ -1,12 +1,20 @@
-# Ollama Cloud Usage CLI
+# Ollama Cloud Usage CLI (+ shared usage core)
 
-Standalone terminal companion to the GNOME Shell extension (`../gnome/`):
-reports Ollama Cloud quota usage on demand. Reads the ollama.com session
-from a locally installed browser — Chrome, Chromium, Brave, Edge, Zen or
-Firefox — using the same cookie-extraction code as the extension
-(libsecret + PBKDF2/AES for Chromium variants, raw SQLite for
-Firefox/Zen), then fetches `https://ollama.com/settings` and prints the
-session (5h) and weekly (7d) quota.
+Two roles in this monorepo:
+
+1. **Standalone terminal tool** — reports Ollama Cloud quota usage on
+   demand. Reads the ollama.com session from a locally installed
+   browser (Chrome, Chromium, Brave, Edge, Zen or Firefox) via
+   libsecret and the appropriate cookie-store reader (PBKDF2 + AES for
+   Chromium variants, raw SQLite for Firefox/Zen), fetches
+   `https://ollama.com/settings` and prints the session (5h) and
+   weekly (7d) quota.
+2. **Source of truth for the shared usage pipeline** — this folder owns
+   the fetch/parse/cookie/crypto logic. The GNOME Shell extension
+   (`../gnome/`) imports these modules through the checked-in
+   `../gnome/cli → ../cli` symlink and must not carry its own copy.
+   Keep feature changes here, then re-verify both surfaces:
+   `make test` and a manual `./ollama-usage.js` run.
 
 ## Usage
 
@@ -40,14 +48,28 @@ judge.
 
 | File | Role |
 |---|---|
-| `ollama-usage.js` | Entry point: arg parsing, HTTP fetch, HTML parsing, rendering |
-| `cookies.js` | Cookie extraction (copied verbatim from `../gnome/cookies.js`) |
-| `crypto.js`  | Chromium Safe Storage AES decryption (copied verbatim) |
-| `pbkdf2.js`  | Pure-JS PBKDF2 (copied verbatim) |
+| `ollama-usage.js` | Executable entry: arg parsing + terminal rendering |
+| `usage.js` | **Core pipeline**: `fetchUsage()` (cookies → Soup GET → status handling) and `parseUsageHtml()`. Imported by both consumers |
+| `cookies.js` | Browser discovery + cookie extraction (libsecret, SQLite) |
+| `crypto.js` | Chromium Safe Storage PBKDF2 + AES-CBC decrypt (via openssl) |
+| `pbkdf2.js` | Pure-JS PBKDF2 (HMAC-SHA1 / SHA-256) |
+| `README.md` | This file |
 
-The three shared modules are deliberately **byte-identical copies** so
-this folder is fully standalone — diffs against `../gnome/` stay clean,
-and you only need to re-copy if the upstream extraction logic changes.
+### How the GNOME extension depends on this folder
+
+- In the repo and in symlinked dev installs, `gnome/scraper.js` loads
+  `./cli/usage.js` where `gnome/cli` is a checked-in symlink to this
+  directory — the panel runs the exact same files as the CLI.
+- For distributable bundles, `make zip` (repo root) copies
+  `usage.js cookies.js crypto.js pbkdf2.js` into the package at
+  `<extdir>/cli/` — the same relative path the imports use, so the
+  source stays deduplicated while the artefact is self-contained.
+- The JSON shape produced by `fetchUsage()` (and printed by
+  `--json`) is the cross-surface contract:
+  `{fetched_at, browser, session_pct?, weekly_pct?,
+  session_resets_at?, weekly_resets_at?, cookie_names}` or
+  `{error, hint}`. Changing it is a breaking change for both surfaces
+  and for any script piping `--json`.
 
 ## Dependencies
 
@@ -55,6 +77,13 @@ and you only need to re-copy if the upstream extraction logic changes.
 - `libsecret` (Chromium keyring access)
 - `python3` (SQLite snapshot reads)
 - `openssl` (AES decryption)
+
+There is nothing to install: run `./ollama-usage.js` straight from a
+checkout. If you want it on your `PATH`:
+
+```sh
+ln -s "$(readlink -f ollama-usage.js)" ~/.local/bin/ollama-usage
+```
 
 ## Security notes
 

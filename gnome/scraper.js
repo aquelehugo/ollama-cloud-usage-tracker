@@ -1,23 +1,26 @@
 // SPDX-License-Identifier: MIT
 //
-// Scraper — fetches ollama.com/settings using browser cookies, parses the
-// dashboard, and emits a GObject signal when the data lands.
+// Scraper — GNOME Shell lifecycle wrapper around the shared usage core.
 //
-// We use Soup.Session (libsoup 3) for the HTTP request. The browser
-// cookies come from ./cookies.js. The parser scrapes the same
-// `aria-label="(Session|Weekly) usage N%"` pattern the pi version
-// was built against, with a fallback regex for newer dashboard layouts.
+// The actual fetching/parsing logic does NOT live here. This module is
+// a thin adapter: it keeps the GObject signals ('updated'/'error'),
+// the GSettings-driven refresh timer and invalidation hooks that the
+// panel indicator (extension.js) binds to, and delegates the real work
+// to cli/usage.js — the single source of truth also used by the CLI.
+//
+// Do not copy fetch/parser logic back into this file; change it in
+// ../cli/usage.js and re-verify both surfaces (gnome/tests + CLI).
+//
+// Cookie extraction stays in cli/cookies.js (keyring + browser
+// discovery). Everything outside GNOME Shell is imported through the
+// ./cli symlink → ../cli, so code reads `./cli/usage.js`. When the
+// extension is bundled (`make zip` from the repo root), the cli/ files
+// are baked into the package at that same relative path.
 
 import GObject from 'gi://GObject';
 import GLib from 'gi://GLib';
-import Soup from 'gi://Soup';
 
-import {getCookiesForOllama} from './cookies.js';
-
-const SETTINGS_URL = 'https://ollama.com/settings';
-const USER_AGENT =
-    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 ' +
-    '(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
+import {fetchUsage, createUsageSession} from './cli/usage.js';
 
 export const Scraper = GObject.registerClass({
     Signals: {
@@ -32,7 +35,8 @@ export const Scraper = GObject.registerClass({
         this._scheduledId = 0;
         this._busy = false;
 
-        this._session = new Soup.Session({user_agent: USER_AGENT});
+        // One shared Soup.Session for all refreshes of this instance.
+        this._soup = createUsageSession();
 
         this.refreshNow();
         this._schedule();
@@ -92,47 +96,7 @@ export const Scraper = GObject.registerClass({
 
     async _fetch() {
         const preferred = this._settings.get_string('preferred-browser');
-        log(`[ollama-tracker] fetch start, preferred=${preferred}`);
-        const cookies = await getCookiesForOllama(preferred);
-        log(`[ollama-tracker] cookies result: ${JSON.stringify(cookies).substring(0, 200)}`);
-        if (!cookies || cookies.error)
-            return Promise.reject(cookies);
-        if (!cookies.header)
-            return Promise.reject({error: 'No cookies', hint: 'Internal error'});
-
-        const msg = Soup.Message.new('GET', SETTINGS_URL);
-        if (!msg)
-            return Promise.reject({error: 'Bad URL', hint: SETTINGS_URL});
-        msg.request_headers.append('Cookie', cookies.header);
-        msg.request_headers.append('User-Agent', USER_AGENT);
-        msg.request_headers.append('Accept', 'text/html,application/xhtml+xml');
-
-        const response = await new Promise((resolve, reject) => {
-            this._session.send_and_read_async(
-                msg,
-                GLib.PRIORITY_DEFAULT,
-                null,
-                (session, result) => {
-                    try {
-                        const input = session.send_and_read_finish(result);
-                        if (msg.status_code >= 300 && msg.status_code < 400)
-                            return reject({error: 'No ollama.com session',
-                                hint: 'Log in to ollama.com in your browser, then refresh'});
-                        if (msg.status_code < 200 || msg.status_code >= 300)
-                            return reject({error: `HTTP ${msg.status_code}`,
-                                hint: 'Check your network connection'});
-                        resolve(new TextDecoder('utf-8').decode(input.get_data()));
-                    } catch (e) {
-                        reject({error: 'Network error', hint: String(e?.message ?? e)});
-                    }
-                },
-            );
-        });
-
-        const parsed = parseUsageHtml(response, cookies.source);
-        if (!parsed)
-            return Promise.reject({error: 'No usage data', hint: 'Check your Ollama Cloud subscription'});
-        return parsed;
+        return fetchUsage(preferred, {session: this._soup});
     }
 
     destroy() {
@@ -142,44 +106,3 @@ export const Scraper = GObject.registerClass({
         }
     }
 });
-
-// ---------------------------------------------------------------------------
-// Parser
-// ---------------------------------------------------------------------------
-
-const USAGE_REGEX = /aria-label="(Session|Weekly) usage (\d+(?:\.\d+)?)%/g;
-const TIME_REGEX = /data-time="([^"]+)"/g;
-const TESTID_REGEX = /data-testid="(session|weekly)-usage"[^>]*>\s*(\d+(?:\.\d+)?)\s*%/g;
-
-function parseUsageHtml(html, source) {
-    const result = {fetched_at: new Date().toISOString(), browser: source ?? null};
-
-    let m;
-    const usages = [];
-    while ((m = USAGE_REGEX.exec(html)) !== null)
-        usages.push({window: m[1].toLowerCase(), pct: parseFloat(m[2])});
-    if (usages.length === 0) {
-        while ((m = TESTID_REGEX.exec(html)) !== null)
-            usages.push({window: m[1].toLowerCase(), pct: parseFloat(m[2])});
-    }
-    for (const u of usages) {
-        if (u.window === 'session')
-            result.session_pct = u.pct;
-        else if (u.window === 'weekly')
-            result.weekly_pct = u.pct;
-    }
-
-    const timestamps = [];
-    while ((m = TIME_REGEX.exec(html)) !== null)
-        timestamps.push(m[1]);
-    if (timestamps[0] && result.session_pct != null)
-        result.session_resets_at = timestamps[0];
-    if (timestamps[1] && result.weekly_pct != null)
-        result.weekly_resets_at = timestamps[1];
-    if (timestamps.length === 1 && result.session_pct == null && result.weekly_pct != null)
-        result.weekly_resets_at = timestamps[0];
-
-    if (result.session_pct == null && result.weekly_pct == null)
-        return null;
-    return result;
-}

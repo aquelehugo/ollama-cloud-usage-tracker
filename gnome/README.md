@@ -1,7 +1,15 @@
 # Ollama Cloud Usage Tracker (GNOME Shell extension)
 
 Live Ollama Cloud usage in the top panel, with detailed quota breakdown
-in a popup menu. Inspired by
+in a popup menu.
+
+> This folder is part of a monorepo. All fetching logic (cookies,
+> decryption, HTTP, HTML parsing) lives in [`../cli/`](../cli/README.md)
+> — the single source of truth shared with the CLI — and is imported
+> here through the checked-in `cli → ../cli` symlink. This README covers
+> the extension itself; see the top-level README for the overall layout.
+
+Inspired by
 [pi-ollama-cloud-usage-tracker](https://github.com/Entelligentsia/pi-ollama-cloud-usage-tracker)
 by Entelligentsia.
 
@@ -28,17 +36,35 @@ exact percentages, reset countdowns, and a "Refresh now" action.
 
 ## Install
 
-### From source
+Requires a checkout of this monorepo (the extension imports shared
+modules from `../cli` — see *How it works* below), GNOME Shell 45–47,
+and a browser with an ollama.com session.
+
+### Recommended: `make install` (symlinked dev install)
+
+From the repo root:
 
 ```bash
-git clone https://github.com/aquelehugo/ollama-cloud-tracker-gnome
-cd ollama-cloud-tracker-gnome
-glib-compile-schemas schemas/
-cp -r . ~/.local/share/gnome-shell/extensions/ollama-cloud-usage-tracker@aquelehugo.github.io/
+make install    # symlink ~/.local/share/gnome-shell/extensions/<uuid> -> gnome/
+make enable     # gnome-extensions enable <uuid>
 ```
 
-Then log out / log in (or restart GNOME Shell with `Alt+F2` → `r`),
-open *Extensions*, and toggle **Ollama Cloud Usage Tracker** on.
+Then restart GNOME Shell — Wayland: log out/in; X11: `Alt+F2` → `r` —
+and toggle **Ollama Cloud Usage Tracker** on in *Extensions* if it is
+not auto-enabled. Because the install is a symlink, updates are just
+`git pull` + a shell reload; no re-copying. The runtime resolves
+`./cli/usage.js` through `gnome/cli → ../cli` inside the checkout, so
+the panel always runs the same core as the CLI.
+
+### Packaged zip
+
+```bash
+make zip        # -> dist/<uuid>.zip, cli/ modules baked in
+```
+
+The zip is self-contained: `make zip` copies the shared `cli/` modules
+into the bundle at `<extdir>/cli/`, which is exactly the path the
+imports use.
 
 ## Requirements
 
@@ -55,33 +81,54 @@ open *Extensions*, and toggle **Ollama Cloud Usage Tracker** on.
 
 ## How it works
 
+All fetching logic is shared with the CLI and lives in `../cli/` (the
+single source of truth — see the top-level README). This folder only
+adds GNOME Shell plumbing.
+
 ```
-┌──────────────┐    ┌──────────────┐    ┌──────────────┐    ┌──────────────┐
-│  scraper.js  │───▶│  cookies.js  │───▶│   crypto.js  │───▶│   Soup 3     │
-│  (GJS)       │    │  (browser    │    │  (PBKDF2 +   │    │   GET        │
-│  scrape HTML │    │   discovery) │    │   AES-CBC)   │    │ /settings    │
-└──────┬───────┘    └──────────────┘    └──────────────┘    └──────┬───────┘
-       │                                                             │
-       ▼                                                             ▼
-  ┌──────────────┐                                          ┌──────────────┐
-  │  bar.js      │  ◀──── percentage ──── panel + popup ────│  ollama.com  │
-  │  pace colour │                                          │  dashboard   │
-  └──────────────┘                                          └──────────────┘
+┌─────────────────────────────┐
+│ gnome/scraper.js   (thin)   │  GObject 'updated'/'error' signals,
+│  ── imports ─▶ ./cli/usage.js   refresh timer, GSettings hooks
+└──────────────┬─────────────┘
+               │ imports via checked-in symlink: cli → ../cli
+┌──────────────▼──────────────────────────────────────────┐
+│ ../cli/   (source of truth)                             │
+│                                                         │
+│  usage.js ───▶ cookies.js ───▶ crypto.js ───▶ pbkdf2.js │
+│   Soup 3 GET    browser         Safe Storage    AES key │
+│   /settings     discovery        + AES decrypt  derive  │
+└──────────────┬──────────────────────────────────────────┘
+               │
+               ▼
+        ollama.com/settings HTML
+               │   aria-label="(Session|Weekly) usage N%"
+               ▼
+  ┌─────────────────────────────┐
+  │ extension.js + bar.js       │ panel `session% / weekly%`,
+  │ Cairo St.DrawingArea bars   │ popup rows, pace colour, menu
+  └─────────────────────────────┘
 ```
 
-1. **scraper.js** asks **cookies.js** for a Cookie header.
-2. **cookies.js** finds the browser's `Cookies` SQLite DB, copies it to
-   `/tmp` (the browser holds a write lock), and feeds the encrypted
-   blobs to **crypto.js**.
-3. **crypto.js** looks up the Safe Storage password in libsecret,
-   derives the AES key with PBKDF2 (`saltysalt` / `saltsalt`, 1
-   iteration, SHA1 / SHA256), and shells out to `openssl enc` for the
+1. **scraper.js** (thin adapter) calls **cli/usage.js** with the
+   preferred browser from GSettings.
+2. **cli/cookies.js** finds the browser's `Cookies` SQLite DB, copies
+   it to `/tmp` (the browser holds a write lock), and feeds the
+   encrypted blobs to **cli/crypto.js**.
+3. **cli/crypto.js** looks up the Safe Storage password in libsecret,
+   derives the AES key with **cli/pbkdf2.js** (`saltysalt` / `saltsalt`,
+   1 iteration, SHA1 / SHA256), and shells out to `openssl enc` for the
    AES-CBC step.
-4. **scraper.js** GETs `https://ollama.com/settings` and parses
-   `aria-label="(Session|Weekly) usage N%"` + `data-time="..."` from the
-   rendered dashboard.
-5. **bar.js** draws the percentage into a Cairo-painted `St.DrawingArea`
-   with a pace-derived colour.
+4. **cli/usage.js** GETs `https://ollama.com/settings` and parses
+   `aria-label="(Session|Weekly) usage N%"` + `data-time="..."` from
+   the rendered dashboard.
+5. **scraper.js** turns the result into GObject signals; **extension.js**
+   renders it — **bar.js** draws the percentage into a Cairo-painted
+   `St.DrawingArea` with a pace-derived colour.
+
+Import hygiene: GNOME code refers to shared modules as `./cli/…`,
+resolved through the checked-in `cli → ../cli` symlink. In the repo and
+in symlinked dev installs it resolves on disk; in zip bundles
+(`make zip`) a real `cli/` copy sits at the same relative path.
 
 ## Preferences
 
@@ -99,11 +146,25 @@ prefs.js                  Adwaita preferences window
 metadata.json             Extension metadata (UUID, shell versions)
 schemas/                  GSettings schema (compiled)
 bar.js                    Painted quota bar widget
-scraper.js                Soup fetch + HTML parser
-cookies.js                Browser discovery + cookie extraction
-crypto.js                 AES-CBC decrypt (calls openssl)
-pbkdf2.js                 Pure-JS PBKDF2 (HMAC-SHA1 / SHA-256)
+scraper.js                Thin lifecycle wrapper around cli/usage.js
+cli -> ../cli             Symlink to the shared usage core (source of truth)
+tests/                    gjs test suite (imports shared modules via cli/)
 ```
+
+The fetching logic itself lives in `../cli/` — `usage.js` (fetch +
+parse), `cookies.js`, `crypto.js`, `pbkdf2.js`. See
+[../cli/README.md](../cli/README.md). Don't add fetch code here.
+
+## Testing
+
+```bash
+make test    # from the repo root
+# or directly:
+bash tests/run-all.sh
+```
+
+The suite imports cookies/crypto/pbkdf2/usage from `../cli/` through
+the symlink, so it exercises the same code the runtime loads.
 
 ## License
 

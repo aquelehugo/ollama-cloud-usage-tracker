@@ -13,8 +13,8 @@
 // uses a 16-byte zero IV; v11 takes the first 16 as the key and the
 // next 16 as the IV.
 
-import {deriveChromeV10Key, deriveChromeV11Key} from '../crypto.js';
-import {pbkdf2, PBKDF2_SHA1, PBKDF2_SHA256} from '../pbkdf2.js';
+import {deriveChromeV10Key, deriveChromeV11Key} from '../../cli/crypto.js';
+import {pbkdf2, PBKDF2_SHA1, PBKDF2_SHA256} from '../../cli/pbkdf2.js';
 
 const SALT_V10 = new Uint8Array([0x73, 0x61, 0x6c, 0x74, 0x79, 0x73, 0x61, 0x6c, 0x74]);
 const SALT_V11 = new Uint8Array([0x73, 0x61, 0x6c, 0x74, 0x73, 0x61, 0x6c, 0x74]);

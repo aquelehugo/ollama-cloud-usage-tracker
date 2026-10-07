@@ -1,45 +1,11 @@
-// Test the ollama.com/settings HTML parser. The regexes here mirror
-// the ones inside scraper.js so we can exercise the parser without
-// pulling in the rest of the GObject/GLib/Soup machinery.
+// Test the ollama.com/settings HTML parser. Imports the parser from
+// the shared usage core (../../cli/usage.js — the single source of
+// truth also used at runtime by gnome/scraper.js and the CLI), so the
+// test exercises exactly the code both surfaces run. usage.js imports
+// gi://Soup at module load, which is fine under plain gjs — libsoup3
+// is a system library, not part of GNOME Shell.
 
-const USAGE_REGEX = /aria-label="(Session|Weekly) usage (\d+(?:\.\d+)?)%/g;
-const TIME_REGEX = /data-time="([^"]+)"/g;
-const TESTID_REGEX = /data-testid="(session|weekly)-usage"[^>]*>\s*(\d+(?:\.\d+)?)\s*%/g;
-
-function parse(html) {
-    const result = {fetched_at: new Date().toISOString(), browser: 'test'};
-    let m;
-    while ((m = USAGE_REGEX.exec(html)) !== null) {
-        const window = m[1].toLowerCase();
-        const pct = parseFloat(m[2]);
-        if (window === 'session')
-            result.session_pct = pct;
-        else if (window === 'weekly')
-            result.weekly_pct = pct;
-    }
-    if (result.session_pct == null && result.weekly_pct == null) {
-        while ((m = TESTID_REGEX.exec(html)) !== null) {
-            const window = m[1].toLowerCase();
-            const pct = parseFloat(m[2]);
-            if (window === 'session')
-                result.session_pct = pct;
-            else if (window === 'weekly')
-                result.weekly_pct = pct;
-        }
-    }
-    const timestamps = [];
-    while ((m = TIME_REGEX.exec(html)) !== null)
-        timestamps.push(m[1]);
-    if (timestamps[0] && result.session_pct != null)
-        result.session_resets_at = timestamps[0];
-    if (timestamps[1] && result.weekly_pct != null)
-        result.weekly_resets_at = timestamps[1];
-    if (timestamps.length === 1 && result.session_pct == null && result.weekly_pct != null)
-        result.weekly_resets_at = timestamps[0];
-    if (result.session_pct == null && result.weekly_pct == null)
-        return null;
-    return result;
-}
+import {parseUsageHtml} from '../../cli/usage.js';
 
 const html = `
 <div class="quota">
@@ -48,7 +14,7 @@ const html = `
 </div>
 `;
 
-const result = parse(html);
+const result = parseUsageHtml(html, 'test');
 if (result.session_pct !== 34.2)
     throw new Error(`session_pct: ${result.session_pct}`);
 if (result.weekly_pct !== 45.8)
@@ -65,8 +31,8 @@ const html2 = `
   <span data-time="2026-07-20T12:00:00Z"></span>
 </div>
 `;
-const r2 = parse(html2);
+const r2 = parseUsageHtml(html2, 'test');
 if (!r2 || r2.weekly_pct !== 45.8)
     throw new Error(`fallback weekly_pct: ${r2?.weekly_pct}`);
 
-print('OK: HTML parser extracts percentages and reset timestamps');
+print('OK: HTML parser (shared core) extracts percentages and reset timestamps');

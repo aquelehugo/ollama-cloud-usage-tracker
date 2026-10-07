@@ -11,7 +11,7 @@
 //   v11 IV (password="peanuts", salt="saltsalt", 1 iter, SHA-256):
 //     d8 2b 7a 71 5f 1a a4 71 4a 1d 92 50 b7 8d 80 5a
 
-import {deriveChromeV10Key, deriveChromeV11Key} from '../crypto.js';
+import {deriveChromeV10Key, deriveChromeV11Key} from '../../cli/crypto.js';
 
 const v10 = await deriveChromeV10Key('peanuts');
 const v11 = await deriveChromeV11Key('peanuts');

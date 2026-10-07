@@ -1,7 +1,7 @@
 // Verifies that the cookies.js module loads and the public API
 // returns the expected error shape when no browser is installed.
 
-import {getCookiesForOllama} from '../cookies.js';
+import {getCookiesForOllama} from '../../cli/cookies.js';
 
 // Force a real attempt by passing 'auto' — with no browser profile
 // present, we should get a friendly error object.
