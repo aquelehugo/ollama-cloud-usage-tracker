@@ -94,8 +94,15 @@ There is nothing to install: run `./ollama-usage.js` straight from a
 checkout. If you want it on your `PATH`:
 
 ```sh
-ln -s "$(readlink -f ollama-usage.js)" ~/.local/bin/ollama-usage
+make bin    # repo root — installs the PATH wrapper at ~/.local/bin/ollama-usage
 ```
+
+`make bin` installs the command as a tiny wrapper script
+(`exec gjs -m <repo>/cli/ollama-usage.js "$@"`) rather than a symlink:
+gjs's ESM loader derives the relative-import base from the module's own
+path, so a module named without a `.js` suffix breaks `./usage.js`
+resolution (verified live from the Plasma tray). The wrapper hands gjs
+the real `.js` path.
 
 ## Security notes
 

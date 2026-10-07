@@ -72,10 +72,13 @@ tries, in order:
    `/home/you/projects/…/cli/ollama-usage.js`
 2. **Repo checkout copy** — only meaningful if the installed package
    sits next to a `cli/` dir
-3. **`ollama-usage` on `$PATH`** — the normal case after `make bin`
-4. **`~/.local/bin/ollama-usage`** — note the executable dataengine
-   runs the command without a shell, so this bare-path candidate works
-   while a literal `~` path would not
+3. **`ollama-usage` on `$PATH`** — the normal case after `make bin`,
+   which installs a wrapper script (`exec gjs -m <repo>/cli/ollama-usage.js`)
+   at `~/.local/bin/ollama-usage`. A plain symlink to the script is NOT
+   enough: gjs needs the module's real `.js` path to resolve its
+   relative imports.
+4. (fallback) bare `ollama-usage` lookup — covered by #3 when
+   `~/.local/bin` is on `$PATH` (it is, on stock Ubuntu/Plasma)
 
 If nothing resolves, the widget shows `!` with a hint in the popup.
 

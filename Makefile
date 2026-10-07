@@ -87,11 +87,18 @@ clean:
 
 # Put the CLI on ~/.local/bin so the Plasma widget (and everything else)
 # can find it by PATH even outside the repo checkout.
+#
+# This is a wrapper script, NOT a symlink: gjs's ESM loader derives the
+# import base directory from the module's own path, and a .js-less name
+# makes './usage.js' resolve to <dir>/usage.js (missing). Gjs needs the
+# real .js path via -m (verified live from the Plasma tray).
 bin:
 	mkdir -p $(HOME)/.local/bin
 	chmod +x $(CLI)/ollama-usage.js
-	ln -sfn $(CLI)/ollama-usage.js $(HOME)/.local/bin/ollama-usage
-	@echo "Installed CLI shortcut: $(HOME)/.local/bin/ollama-usage -> $(CLI)/ollama-usage.js"
+	rm -f $(HOME)/.local/bin/ollama-usage
+	printf '#!/bin/sh\nexec gjs -m "$(CLI)/ollama-usage.js" "$$@"\n' > $(HOME)/.local/bin/ollama-usage
+	chmod +x $(HOME)/.local/bin/ollama-usage
+	@echo "Installed CLI wrapper: $(HOME)/.local/bin/ollama-usage -> gjs -m $(CLI)/ollama-usage.js"
 
 # Dev install: kpackagetool5 makes a real copy under
 # ~/.local/share/plasma/plasmoids/<id> (KPackage discovery does NOT read
