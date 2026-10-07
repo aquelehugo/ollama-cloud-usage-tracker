@@ -2,7 +2,7 @@
   "name": "Ollama Cloud Usage Tracker",
   "description": "Live Ollama Cloud usage bars in the top panel, with detailed quota breakdown in a popup menu. Reads ollama.com session cookies from Chrome, Firefox, and Zen via libsecret.",
   "uuid": "ollama-cloud-usage-tracker@aquelehugo.github.io",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "shell-version": [
     "45",
     "46",

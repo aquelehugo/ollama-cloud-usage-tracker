@@ -155,6 +155,15 @@ make test          # gjs test suite in gnome/tests/, including tests
 make test-plasma   # node parity tests for the Plasma widget helpers
 ```
 
+## Releases
+
+CI builds and attaches all packages automatically whenever a `v*` tag
+is pushed (after the test suite passes). To cut a release: bump the
+three version spots (`cli/ollama-usage.js` VERSION, `gnome/metadata.json`,
+`plasma/metadata.json`), commit, then `git tag vX.Y.Z && git push
+origin vX.Y.Z`. The tag's release gets the GNOME zip, the Plasma
+plasmoid and `sha256sums.txt`, plus generated notes.
+
 ## Version history
 
 This project used to be a single GNOME Shell extension, grew a CLI, and
