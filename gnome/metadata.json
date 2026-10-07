@@ -8,7 +8,7 @@
     "46",
     "47"
   ],
-  "url": "https://github.com/aquelehugo/ollama-cloud-tracker-gnome",
+  "url": "https://github.com/aquelehugo/ollama-cloud-usage-tracker",
   "author": "aquelehugo",
   "license": "MIT",
   "settings-schema": "org.gnome.shell.extensions.ollama-cloud-usage-tracker"

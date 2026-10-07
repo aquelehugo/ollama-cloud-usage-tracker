@@ -170,14 +170,14 @@ panel-add:
 
 panel-remove:
 	@qdbus org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript \
-	@'var n = 0; desktops().concat(panels()).forEach(function (c) { c.widgets().forEach(function (w) { if (w.type === "$(PLASMA_ID)") { w.remove(); n++; } }); }); print("removed " + n);'
+	'var n = 0; desktops().concat(panels()).forEach(function (c) { c.widgets().forEach(function (w) { if (w.type === "$(PLASMA_ID)") { w.remove(); n++; } }); }); print("removed " + n);'
 
 # Distributable package: KPackage layout (metadata.json + contents/) at the
 # zip root; tests stay out.
 zip-plasma:
 	@mkdir -p $(DIST); \
-	@( cd $(PLASMA) && zip -q -r $(DIST)/$(PLASMA_ID).plasmoid contents metadata.json README.md ); \
-	@echo "Built $(DIST)/$(PLASMA_ID).plasmoid"
+	( cd $(PLASMA) && zip -q -r $(DIST)/$(PLASMA_ID).plasmoid contents metadata.json README.md ); \
+	echo "Built $(DIST)/$(PLASMA_ID).plasmoid"
 
 # Unit tests for the pure-JS helpers + structural validation of the
 # package metadata/config.

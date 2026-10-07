@@ -5,7 +5,7 @@
                 "Name": "aquelehugo"
             }
         ],
-        "BugReportUrl": "https://github.com/aquelehugo/ollama-cloud-tracker-gnome/issues",
+        "BugReportUrl": "https://github.com/aquelehugo/ollama-cloud-usage-tracker/issues",
         "Category": "System Information",
         "Description": "Ollama Cloud session (5h) and weekly (7d) quota bars in the system tray. Powered by the ollama-usage CLI (source of truth).",
         "EnabledByDefault": true,
@@ -16,7 +16,7 @@
         "Name": "Ollama Cloud Usage Tracker",
         "ServiceTypes": ["Plasma/Applet"],
         "Version": "0.1.0",
-        "Website": "https://github.com/aquelehugo/ollama-cloud-tracker-gnome"
+        "Website": "https://github.com/aquelehugo/ollama-cloud-usage-tracker"
     },
     "X-Plasma-API": "declarativeappletscript",
     "X-Plasma-MainScript": "ui/main.qml"

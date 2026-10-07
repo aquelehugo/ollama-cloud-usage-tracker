@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install runtime deps (gjs + GIO typelibs for the shared cli/ core)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            gjs \
+            gir1.2-secret-1 \
+            gir1.2-soup-3.0 \
+            libglib2.0-dev-bin \
+            zip
+
+      - name: Dependency check (gjs/python3/openssl + typelibs)
+        run: make check-deps
+
+      - name: GNOME test suite (gjs)
+        run: make test
+
+      - name: Plasma widget parity tests (node)
+        run: make test-plasma
+
+      - name: Package (GNOME zip + Plasma plasmoid)
+        run: make zip zip-plasma
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages
+          path: |
+            dist/*.zip
+            dist/*.plasmoid

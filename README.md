@@ -1,5 +1,7 @@
 # Ollama Cloud Usage Tracker
 
+[![CI](https://github.com/aquelehugo/ollama-cloud-usage-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/aquelehugo/ollama-cloud-usage-tracker/actions/workflows/ci.yml)
+
 Track your Ollama Cloud quota (session 5h / weekly 7d) on Linux. This
 monorepo ships three surfaces built on **one shared implementation**:
 
