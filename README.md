@@ -13,8 +13,8 @@ monorepo ships three surfaces built on **one shared implementation**:
   bars in the top panel with a detailed popup, pace colouring and
   preferences. It **depends on the CLI's modules** and must not carry
   its own copy of the logic.
-- **`plasma/`** — a Plasma 5.27 system-tray widget with the same
-  status-bar format (`34% / 45%`), an icon toggle and a click popup
+- **`plasma/`** — a standalone Plasma 5.27 **panel widget** with the
+  GNOME-format `34% / 45%` label, an icon toggle and a click popup
   mirroring the GNOME menu. Plasma applets run in their own process,
   so it **depends on the CLI executable**: it runs
   `ollama-usage.js --json` and renders the JSON contract.
@@ -78,20 +78,18 @@ make zip          # -> dist/<uuid>.zip
 ### Plasma widget
 
 ```sh
-make bin                                            # put CLI on ~/.local/bin (widget discovery)
-make install-plasma                                 # kpackagetool5 copy-install + hicolor icon
-systemctl --user restart plasma-plasmashell.service  # register + load
+make bin              # put CLI on ~/.local/bin (widget discovery)
+make install-plasma   # kpackagetool5 copy-install + hicolor icon
+make panel-add        # place on the first panel (or Add Widgets manually)
 ```
 
-The status bar shows `34% / 45%` with an optional ollama icon; a click
-opens the popup (quota bars, countdowns, refresh, settings link). If
-the tray does not pick it up automatically, add it via *Configure
-System Tray → Items*. The widget runs the CLI with `--json`; discovery
-order is the CLI-path setting → `$PATH` (~/.local/bin via `make bin`).
-Note: re-run `make install-plasma` after QML edits — Plasma's
-KPackage discovery cannot see symlinked plasmoid dirs (unlike GNOME
-Shell), so the dev install is a refreshed copy. See
-[plasma/README.md](plasma/README.md) for details.
+A **standalone panel widget**: ollama icon + `34% / 45%` on the panel,
+click opens the popup (quota bars, countdowns, refresh, settings
+link). It degrades to a compact badge inside the system tray — that
+tray structurally cannot show wide text. The widget runs the CLI with
+`--json`; discovery order is the CLI-path setting → `$PATH`
+(~/.local/bin via `make bin`). Note: re-run `make install-plasma`
+after QML edits. See [plasma/README.md](plasma/README.md) for details.
 
 ## Usage
 

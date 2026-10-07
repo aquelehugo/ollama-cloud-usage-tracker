@@ -1,10 +1,16 @@
 # Ollama Cloud Usage Tracker (Plasma widget)
 
-Live Ollama Cloud quota in the **system tray** (status bar), shaped like
-the GNOME extension: an optional ollama icon plus the classic
-`34% / 45%` label, a popup "menu" on click with pace-coloured quota
-bars, exact percentages and reset countdowns, and Refresh /
+Live Ollama Cloud quota on a Plasma **panel** as a standalone widget,
+shaped like the GNOME extension: the ollama icon plus the classic
+`34% / 45%` label, a popup on click with pace-coloured quota bars,
+exact percentages and reset countdowns, and Refresh /
 ollama.com/settings actions.
+
+> Place it directly on a panel (via `make panel-add` or
+> right-click → *Add Widgets*) — Plasma 5.27's system tray cannot carry
+> wide text (see the sizing note below), so the panel is the supported
+> home. If placed in the tray anyway, it degrades gracefully to a
+> compact badge.
 
 > **Thin UI wrapper.** The fetching logic (browser cookie extraction,
 > Chromium Safe Storage decryption, HTTP fetch, HTML parsing) is NOT in
@@ -20,17 +26,19 @@ Inspired by the GNOME extension in `../gnome/`.
 
 ## How to use
 
-After installing (below), the widget appears in the system tray. The
-compact item adapts to the space it actually gets — measured at
+Place the widget on a panel: `make panel-add`, or right-click the panel
+→ *Add Widgets…* → search **Ollama Cloud Usage Tracker** and drag it in.
+The compact item adapts to the space it actually gets — measured at
 runtime, so high-DPI/panel changes need no extra config:
 
-- **Panel placement / roomy tray** (e.g. the tray's "Scale icons to
-  fit" mode): full GNOME-format label — icon + `34% / 45%`.
-- **Standard tray cell** (Plasma 5.27 force-fills every applet into an
-  icon-sized box and ignores width requests): battery-parity badge —
-  ollama icon with the rounded session percentage in the corner (or a
-  small centred `%` figure when the icon is hidden). Full numbers stay
-  one click away in the popup.
+- **On a panel** (the supported placement, icon toggle off/on as in
+  settings): full GNOME-format label — icon + `34% / 45%`.
+- **Inside the system tray** (not supported for wide text — Plasma
+  5.27's tray force-fills applets into fixed icon-sized boxes and
+  ignores width requests): battery-parity badge — ollama icon with the
+  rounded session percentage in the corner (or a small centred `%`
+  figure when the icon is hidden). Full numbers stay one click away in
+  the popup.
 - `—` = no data yet, `!` = error (details in the popup, warning icon
   instead of the ollama logo).
 
@@ -55,21 +63,27 @@ not started), the CLI dependency set: `gjs`, `libsecret`, `python3`,
 From the repo root:
 
 ```bash
-make bin                                            # CLI symlink at ~/.local/bin/ollama-usage
+make bin                                            # CLI wrapper at ~/.local/bin/ollama-usage
 make install-plasma                                 # kpackagetool5 -i/-u copy + hicolor icon
-systemctl --user restart plasma-plasmashell.service  # register + load
+make panel-add                                      # place on the first panel
 ```
+
+Or add manually: right-click a panel → *Add Widgets…* → 
+**Ollama Cloud Usage Tracker** (appears in the picker right after
+`install-plasma`; no shell restart needed — plasmashell watches the
+plasmoid dirs).
 
 `install-plasma` copies the package via `kpackagetool5`
 (**not** a symlink: KPackage discovery does not read symlinked plasmoid
-dirs — unlike GNOME Shell extension folders; verified live), installs
-the ollama icon into `hicolor`, and the `X-Plasma-NotificationArea`
-metadata makes the tray auto-add the widget on the next shell start
-(confirmed: the id landed in `extraItems` without manual steps).
-If it does not appear: right-click the tray arrow →
-*Configure System Tray* → *Items* → add **Ollama Cloud Usage Tracker**.
+dirs — unlike GNOME Shell extension folders; verified live) and
+installs the ollama icon into `hicolor`. It is a PANEL widget now:
+tray auto-add metadata (`X-Plasma-NotificationArea`) was removed — if
+the tray still shows a stale badge entry from earlier installs, remove
+it in *Configure System Tray → Items* or with `make panel-remove` / a
+config purge.
 
-Dev loop: edit → `make install-plasma` → restart plasmashell.
+Dev loop: edit → `make install-plasma` → restart plasmashell
+(`systemctl --user restart plasma-plasmashell.service`).
 
 ### CLI discovery
 

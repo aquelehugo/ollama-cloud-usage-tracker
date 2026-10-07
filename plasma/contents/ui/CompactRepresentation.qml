@@ -107,7 +107,7 @@ MouseArea {
         text: compactRoot.badgeSessionPct + "%"
         font.pixelSize: compactRoot.height >= 30
             ? Math.round(compactRoot.height * 0.30)
-            : PlasmaCore.Units.fontMetrics.font.pixelSize * 0.8
+            : Math.round(fontMetrics.font.pixelSize * 0.8)
         font.bold: true
     }
 
@@ -115,7 +115,11 @@ MouseArea {
         visible: !compactRoot.fullMode && !compactRoot.cfgShowIcon
         anchors.centerIn: parent
         text: compactRoot.badgeSessionPct != null ? compactRoot.badgeSessionPct + "%" : "…"
-        font.pixelSize: Math.round(PlasmaCore.Units.gridUnit * 0.8)
+        font.pixelSize: Math.round(fontMetrics.font.pixelSize * 0.8)
         font.bold: true
+    }
+
+    TextMetrics {
+        id: fontMetrics   // app default theme font — no PlasmaCore.Units.fontMetrics on 5.27
     }
 }

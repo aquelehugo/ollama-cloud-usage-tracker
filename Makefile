@@ -8,11 +8,14 @@
 # Targets:
 #   make test           run the gnome/ test suite
 #   make schemas        (re)compile GSettings schemas
-#   make install        install the Gnome extension as a symlink to the repo
-#   make enable         enable the Gnome extension via gnome-extensions
-#   make zip            build a distributable Gnome extension zip (bakes cli/ in)
-#   make bin            symlink the CLI into ~/.local/bin (used by plasma auto-detect)
-#   make install-plasma install the Plasma widget as a symlink to the repo
+#   make install        install the GNOME extension as a symlink to the repo
+#   make enable         enable the GNOME extension via gnome-extensions
+#   make zip            build a distributable GNOME extension zip (bakes cli/ in)
+#   make bin            ~/.local/bin wrapper for the CLI (used by plasma discovery)
+#   make install-plasma install the Plasma widget (kpackagetool5 copy)
+#   make panel-add      place the Plasma widget on the first panel
+#   make panel-remove   remove Plasma widget instance(s) from panels/desktops
+#   make uninstall-plasma  kpackagetool5 removal (run panel-remove first)
 #   make zip-plasma     build a distributable Plasma package zip
 #   make test-plasma    node unit tests for the Plasma widget helpers
 #   make clean          remove build output
@@ -28,7 +31,7 @@ EXTROOT            := $(HOME)/.local/share/gnome-shell/extensions
 EXTDIR             := $(EXTROOT)/$(UUID)
 SCHEMAXML           := $(GNOME)/schemas/org.gnome.shell.extensions.ollama-cloud-usage-tracker.gschema.xml
 
-.PHONY: help test schemas install enable zip clean bin install-plasma uninstall-plasma zip-plasma test-plasma
+.PHONY: help test schemas install enable zip clean bin install-plasma uninstall-plasma panel-add panel-remove zip-plasma test-plasma
 
 help:
 	@sed -n '2,19p' Makefile
@@ -119,6 +122,20 @@ install-plasma:
 
 uninstall-plasma:
 	kpackagetool5 -t Plasma/Applet -r $(PLASMA_ID)
+	@echo "Note: uninstalling the package does not purge placement entries —"
+	@echo "use 'make panel-remove' first if the widget is on a panel."
+
+# Panel placement helpers (Plasma scripting API). The Plasma 5.27 system
+# tray force-fills applets into icon cells, so the full '34% / 45%' label
+# is only available when the widget is placed directly on a panel.
+panel-add:
+	@qdbus org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript \
+	'var p = panels(); if (p.length > 0) { p[0].addWidget("$(PLASMA_ID)"); print("added $(PLASMA_ID) to panel " + p[0]); } else { print("NO PANEL FOUND"); }'
+	@echo "Drag the widget to taste; right-click for context menu."
+
+panel-remove:
+	@qdbus org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript \
+	'var n = 0; desktops().concat(panels()).forEach(function (c) { c.widgets().forEach(function (w) { if (w.type === "$(PLASMA_ID)") { w.remove(); n++; } }); }); print("removed " + n);'
 
 # Distributable package: KPackage layout (metadata.json + contents/) at the
 # zip root; tests stay out.

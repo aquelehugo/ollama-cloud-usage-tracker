@@ -19,7 +19,5 @@
         "Website": "https://github.com/aquelehugo/ollama-cloud-tracker-gnome"
     },
     "X-Plasma-API": "declarativeappletscript",
-    "X-Plasma-MainScript": "ui/main.qml",
-    "X-Plasma-NotificationArea": "true",
-    "X-Plasma-NotificationAreaCategory": "ApplicationStatus"
+    "X-Plasma-MainScript": "ui/main.qml"
 }
