@@ -41,6 +41,11 @@ monorepo ships three surfaces built on **one shared implementation**:
 
 ## Install
 
+> Prebuilt packages (GNOME extension zip + Plasma plasmoid) are attached
+> to [v0.1.0](https://github.com/aquelehugo/ollama-cloud-usage-tracker/releases/tag/v0.1.0)
+> and every future release; `sha256sums.txt` comes with each one. The
+> CLI itself ships via the checkout (it needs the repo's `cli/` folder).
+
 Requirements: GNOME 45+ (for the extension), `gjs`, `libsoup 3`,
 `libsecret`, `python3`, `openssl` — everything pre-installed on a
 current GNOME desktop except sometimes gjs (`gjs` package).
